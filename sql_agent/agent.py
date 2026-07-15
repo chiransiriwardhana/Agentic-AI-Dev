@@ -186,10 +186,37 @@ agent = builder.compile()
 
 display(Image(agent.get_graph().draw_mermaid_png()))
 
-question = "Which genre on average has the longest tracks?"
+# query = "Which genre on average has the longest tracks?"
 
-for step in agent.stream(
-    {"messages": [{"role": "user", "content": question}]},
-    stream_mode="values",
-):
-    step["messages"][-1].pretty_print()
+# for step in agent.stream(
+#     {"messages": [{"role": "user", "content": question}]},
+#     stream_mode="values",
+# ):
+#     step["messages"][-1].pretty_print()
+
+
+while True:
+    query = input("\nYou: ")
+
+    if query.lower() == "exit":
+        break
+    try:
+        for step in agent.stream(
+            {
+                "messages":
+                [
+                    {
+                        "role": "user",
+                        "content": query
+                    }
+                ]
+            },
+            stream_mode="values"
+
+        ):
+            print("\nAssistant:")
+            step["messages"][-1].pretty_print()
+
+
+    except Exception as e:
+        print("Error:", e)

@@ -80,27 +80,57 @@ print("Agent Ready!")
 print("----------------")
 
 
+# ======================
+# Conversation Memory
+# ======================
+# Keeps the full running history of the conversation (user turns,
+# assistant turns, and any tool calls/results in between) so the agent
+# has context from earlier in the session on every new invocation.
+conversation_history = []
+
+# Optional safety valve: cap how many messages we keep, so very long
+# sessions don't blow up token usage / context length. Set to None to
+# keep everything.
+MAX_HISTORY_MESSAGES = 40
+
+
+def trim_history(history):
+    if MAX_HISTORY_MESSAGES is not None and len(history) > MAX_HISTORY_MESSAGES:
+        return history[-MAX_HISTORY_MESSAGES:]
+    return history
+
+
 while True:
     query = input("\nYou: ")
 
     if query.lower() == "exit":
         break
+
+    conversation_history.append(
+        {
+            "role": "user",
+            "content": query
+        }
+    )
+    conversation_history = trim_history(conversation_history)
+
     try:
         response = agent.invoke(
             {
-                "messages":
-                [
-                    {
-                        "role": "user",
-                        "content": query
-                    }
-                ]
+                "messages": conversation_history
             }
-
         )
+
+        # response["messages"] contains the full trace for this invocation
+        # (including tool calls). Replace our running history with it so
+        # tool call/result messages are preserved for future context too.
+        conversation_history = trim_history(response["messages"])
 
         print("\nAssistant:")
         print(response["messages"][-1].content)
 
     except Exception as e:
         print("Error:", e)
+        # Roll back the user message we just added so a failed turn
+        # doesn't corrupt the history with an unanswered question.
+        conversation_history.pop()
