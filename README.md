@@ -73,7 +73,7 @@ flowchart TD
   
 5.   if you want to end chat then type exit.
 
-e.g
+e.g-1
 
 ```
 You: run hello-world.py
@@ -108,8 +108,163 @@ let me know what you need help with.
 You: exit
 ```
 
+e.g-2
+
+```
+Agent Ready!
+----------------
+
+You: run pi_value_compute.py
+
+Assistant:
+Ran pi_value_compute.py successfully.
+
+Pi value:
+3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679821480865132823066470938446095505822317253594081284811174502841027019385211055596446229489549303819644288109756659334461284756482337867831652712019091456485669234603486104543266482133936072602491412737245870066063155881748815209209628292540917153643678925903600113305305488204665213841469519415116094330572703657595919530921861173819326117931051185480744623799627495673518857527248912279381830119491298336733624406566430860213949463952247371907021798609437027705392171762931767523846748184676694051320005681271452635608277857713427577896091736371787214684409012249534301465495853710507922796892589235420199561121290219608640344181598136297747713099605187072113499999983729780499510597317328160963185950244594553469083026425223082533446850352619311881710100031378387528865875332083814206171776691473035982534904287554687311595628638823537875937519577818577805321712268066130019278766111959092164201989380952569
+
+Saved to pi_1000_digits.txt
+
+Would you like me to open or display that file, or copy the digits elsewhere?
+
+You: create file with name content.txt in root folder. content should be contemt of pi_100_digits.txt
+
+Assistant:
+I couldn’t find a file named pi_100_digits.txt in the project. Current directory contains:
+- agent.py
+- pi_1000_digits.txt
+- scripts
+- tool.py
+
+Please confirm:
+- Should I create content.txt in the current project root (/Users/chiransiriwardena/Documents/Script_executing_agent/script_executor_agent)?
+- Do you want me to use the first 100 digits from pi_1000_digits.txt as the content, or provide the correct path to pi_100_digits.txt?
+
+You: yes create content.txt in the current project root (/Users/chiransiriwardena/Documents/Script_executing_agent/script_executor_agent) and use the first 100 digits from pi_1000_digits.txt as the content
+
+Assistant:
+Done.
+
+- Created content.txt in /Users/chiransiriwardena/Documents/Script_executing_agent/script_executor_agent
+- Wrote the first 100 numeric digits from pi_1000_digits.txt
+
+content.txt:
+3141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117067
+
+Character count: 100
+
+Anything else you'd like me to do with this file?
+
+You: exit
+```
+
 ##### Agent only have ability to run python script and runing terminal commands
 
 ## Run SQL Agent
 1. cd sql_agent
 2. python agent.py
+
+e.g-1
+```
+You: Which genre on average has the longest tracks?
+
+Assistant:
+================================ Human Message =================================
+
+Which genre on average has the longest tracks?
+
+Assistant:
+================================== Ai Message ==================================
+
+Available tables: Album, Artist, Customer, Employee, Genre, Invoice, InvoiceLine, MediaType, Playlist, PlaylistTrack, Track
+
+Assistant:
+================================== Ai Message ==================================
+Tool Calls:
+  sql_db_schema (call_WJxYAJpprAxGbaW8gC70ZSW0)
+ Call ID: call_WJxYAJpprAxGbaW8gC70ZSW0
+  Args:
+    table_names: Track, Genre
+
+Assistant:
+================================= Tool Message =================================
+Name: sql_db_schema
+
+
+CREATE TABLE "Genre" (
+        "GenreId" INTEGER NOT NULL, 
+        "Name" NVARCHAR(120), 
+        PRIMARY KEY ("GenreId")
+)
+
+/*
+3 rows from Genre table:
+GenreId Name
+1       Rock
+2       Jazz
+3       Metal
+*/
+
+
+CREATE TABLE "Track" (
+        "TrackId" INTEGER NOT NULL, 
+        "Name" NVARCHAR(200) NOT NULL, 
+        "AlbumId" INTEGER, 
+        "MediaTypeId" INTEGER NOT NULL, 
+        "GenreId" INTEGER, 
+        "Composer" NVARCHAR(220), 
+        "Milliseconds" INTEGER NOT NULL, 
+        "Bytes" INTEGER, 
+        "UnitPrice" NUMERIC(10, 2) NOT NULL, 
+        PRIMARY KEY ("TrackId"), 
+        FOREIGN KEY("MediaTypeId") REFERENCES "MediaType" ("MediaTypeId"), 
+        FOREIGN KEY("GenreId") REFERENCES "Genre" ("GenreId"), 
+        FOREIGN KEY("AlbumId") REFERENCES "Album" ("AlbumId")
+)
+
+/*
+3 rows from Track table:
+TrackId Name    AlbumId MediaTypeId     GenreId Composer        Milliseconds    Bytes   UnitPrice
+1       For Those About To Rock (We Salute You) 1       1       1       Angus Young, Malcolm Young, Brian Johnson       343719   11170334        0.99
+2       Balls to the Wall       2       2       1       None    342562  5510424 0.99
+3       Fast As a Shark 3       2       1       F. Baltes, S. Kaufman, U. Dirkscneider & W. Hoffman     230619  3990994 0.99
+*/
+
+Assistant:
+================================== Ai Message ==================================
+Tool Calls:
+  sql_db_query (call_XgbdWwTjJZ2uvQZxCk2KEehl)
+ Call ID: call_XgbdWwTjJZ2uvQZxCk2KEehl
+  Args:
+    query: SELECT Genre.Name, AVG(Track.Milliseconds) / 60000 as AvgTrackLengthMinutes
+FROM Track
+JOIN Genre ON Track.GenreId = Genre.GenreId
+GROUP BY Genre.Name
+ORDER BY AvgTrackLengthMinutes DESC
+LIMIT 5;
+
+Assistant:
+================================== Ai Message ==================================
+Tool Calls:
+  sql_db_query (call_U9HEcKYu69Bc6atOSPrWhDMM)
+ Call ID: call_U9HEcKYu69Bc6atOSPrWhDMM
+  Args:
+    query: SELECT Genre.Name, AVG(Track.Milliseconds) / 60000 as AvgTrackLengthMinutes
+FROM Track
+JOIN Genre ON Track.GenreId = Genre.GenreId
+GROUP BY Genre.Name
+ORDER BY AvgTrackLengthMinutes DESC
+LIMIT 5;
+
+Assistant:
+================================= Tool Message =================================
+Name: sql_db_query
+
+[('Sci Fi & Fantasy', 48.52971730769231), ('Science Fiction', 43.759151282051285), ('Drama', 42.92139635416667), ('TV Shows', 35.75068369175627), ('Comedy', 26.421061764705883)]
+
+Assistant:
+================================== Ai Message ==================================
+
+On average, the genre with the longest tracks is "Sci Fi & Fantasy," with an average track length of approximately 48.53 minutes.
+
+You: exit
+```
