@@ -87,8 +87,8 @@ Would you like me to display all digits here or open the file?
 You: open  pi_1000_digits.txt
 
 Assistant:
-I’ve opened the file pi_1000_digits.txt. Let me know if you’d like me to display its contents, search for something
-specific, or perform any other action with it.
+I’ve opened the file pi_1000_digits.txt. Let me know if you’d like me to display
+its contents, search for something specific, or perform any other action with it.
 
 You: no i donot want
 
