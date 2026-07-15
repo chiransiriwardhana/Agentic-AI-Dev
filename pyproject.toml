@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "script-executor-agent"
+version = "0.1.0"
+description = "LangGraph based script executor agent"
+authors = ["Your Name"]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12"
+
+langchain = "^1.3.12"
+langchain-core = "^1.2.0"
+langchain-community = "^0.4.1"
+langchain-openai = "^1.0.0"
+langgraph = "^1.0.7"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

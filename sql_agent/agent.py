@@ -39,9 +39,9 @@ else:
 
 db = SQLDatabase.from_uri("sqlite:///Chinook.db")
 
-print(f"Dialect: {db.dialect}")
-print(f"Available tables: {db.get_usable_table_names()}")
-print(f'Sample output: {db.run("SELECT * FROM Artist LIMIT 5;")}')
+# print(f"Dialect: {db.dialect}")
+# print(f"Available tables: {db.get_usable_table_names()}")
+# print(f'Sample output: {db.run("SELECT * FROM Artist LIMIT 5;")}')
 
 
 toolkit = SQLDatabaseToolkit(db=db, llm=model)
