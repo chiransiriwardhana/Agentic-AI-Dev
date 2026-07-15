@@ -93,8 +93,9 @@ its contents, search for something specific, or perform any other action with it
 You: no i donot want
 
 Assistant:
-No problem. Could you tell me what you don’t want, and what you’d like instead? If you want me to stop or cancel the
-previous action, just say “stop,” otherwise let me know what you need help with.
+No problem. Could you tell me what you don’t want, and what you’d like instead?
+If you want me to stop or cancel the previous action, just say “stop,” otherwise
+let me know what you need help with.
 
 You: exit
 ```
