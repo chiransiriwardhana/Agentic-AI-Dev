@@ -124,13 +124,7 @@ def normalize_command(command: str) -> str:
     command = command.strip()
 
     if command.startswith("```"):
-
-        lines = [
-            line
-            for line in command.splitlines()
-            if not line.strip().startswith("```")
-        ]
-
+        lines = [line for line in command.splitlines() if not line.strip().startswith("```")]
         command = "\n".join(lines).strip()
 
     command = command.strip("`")
@@ -139,7 +133,6 @@ def normalize_command(command: str) -> str:
         command = command[1:-1]
 
     return command.strip()
-
 
 
 def infer_base_directory(user_message: str):
