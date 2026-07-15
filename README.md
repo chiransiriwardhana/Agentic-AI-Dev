@@ -159,6 +159,91 @@ Anything else you'd like me to do with this file?
 You: exit
 ```
 
+e.g-3
+
+```
+python agent.py
+Agent Ready!
+----------------
+
+You: can you run ~/Documents/Rust/Rust/src/test.rs    
+
+Assistant:
+Output:
+Hello, world!
+The value of x is: 7
+The value of x is: 8
+The value of y is: true
+The interproduct of 1, 2, and 3 is: 11
+
+You: I want to see the code's source 
+
+Assistant:
+Here is the source for ~/Documents/Rust/Rust/src/test.rs:
+
+fn interproduct(a: i32, b: i32, c: i32) -> i32 {
+    return a *b + b * c + c * a;
+}
+
+
+fn main() {
+    println!("Hello, world!");
+
+    let _x_ = 6;
+    let x = 7;
+
+    println!("The value of x is: {}", x);
+
+    let x = x + 1;
+    println!("The value of x is: {}", x);
+
+    let y: bool = true;
+    println!("The value of y is: {}", y);
+
+    println!("The interproduct of 1, 2, and 3 is: {}", interproduct(1, 2, 3));
+}
+
+You: can you modify the test.rs file to increment x by one and print incremented at last line
+
+Assistant:
+Done. I updated test.rs to increment x by one at the end and print "incremented: ...".
+
+Current source:
+fn interproduct(a: i32, b: i32, c: i32) -> i32 {
+    return a * b + b * c + c * a;
+}
+
+fn main() {
+    println!("Hello, world!");
+
+    let _x_ = 6;
+    let x = 7;
+
+    println!("The value of x is: {}", x);
+
+    let x = x + 1;
+    println!("The value of x is: {}", x);
+
+    let y: bool = true;
+    println!("The value of y is: {}", y);
+
+    println!("The interproduct of 1, 2, and 3 is: {}", interproduct(1, 2, 3));
+
+    let x = x + 1;
+    println!("incremented: {}", x);
+}
+
+Program output:
+Hello, world!
+The value of x is: 7
+The value of x is: 8
+The value of y is: true
+The interproduct of 1, 2, and 3 is: 11
+incremented: 9
+
+Want me to keep the earlier prints or change it to only print the final incremented value?
+```
+
 ## Run SQL Agent
 1. cd sql_agent
 2. python agent.py
