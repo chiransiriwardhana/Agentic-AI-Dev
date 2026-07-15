@@ -34,11 +34,11 @@ User question → LLM reasoning → SQL generation → SQL validation → Databa
         |                    |
         v                    v
   Database Tools        GPT-4o Reasoning
-        |
-        |
+        |                    
+        v 
    SQLite Chinook DB
-        |
-        |
+        |                    
+        v 
      SQL Result
         |
         v
