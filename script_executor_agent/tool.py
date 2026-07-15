@@ -24,6 +24,8 @@ llm = ChatOpenAI(
 # Python Script Tool
 # ==========================
 
+# Fallback directory used only when a bare filename (no path) is given
+# and it isn't found in the current working directory.
 SCRIPTS_DIR = Path("scripts")
 
 # Use the same interpreter that's currently running, instead of assuming
@@ -31,21 +33,61 @@ SCRIPTS_DIR = Path("scripts")
 import sys
 PYTHON_EXECUTABLE = sys.executable or "python"
 
-@tool
-def run_python_script(script_name: str) -> str:
+def _resolve_script_path(script_name: str) -> Path:
     """
-    Execute a Python script from the scripts directory.
+    Resolves a script path from any of:
+      - an absolute path (Windows or POSIX): C:\\Users\\me\\train.py, /home/me/train.py
+      - a relative path from the current working directory: subdir/train.py, ../train.py
+      - a path using "~" for home: ~/scripts/train.py
+      - a bare filename: train.py (checked in CWD first, then SCRIPTS_DIR as a fallback)
+    """
+
+    expanded = os.path.expanduser(script_name.strip().strip('"').strip("'"))
+    candidate = Path(expanded)
+
+    # Absolute path (works for both "C:\..." and "/...") or an explicit relative path
+    if candidate.is_absolute():
+        return candidate
+
+    if candidate.exists():
+        return candidate.resolve()
+
+    # Bare filename or relative path that didn't resolve from CWD directly:
+    # fall back to the scripts/ folder for backward compatibility.
+    fallback = SCRIPTS_DIR / candidate
+    if fallback.exists():
+        return fallback.resolve()
+
+    # Nothing matched; return the most likely candidate so the caller can
+    # report a clear "not found" message with the path it actually tried.
+    return candidate
+
+@tool
+def run_python_script(script_path_input: str) -> str:
+    """
+    Execute a Python script from anywhere on the filesystem.
+
+    Accepts:
+      - An absolute path: /Users/me/project/train.py or C:\\Users\\me\\project\\train.py
+      - A relative path: subdir/train.py or ../scripts/test.py
+      - A "~"-based path: ~/Documents/scripts/train.py
+      - A bare filename: hello.py (checked in the current directory first,
+        then in a local "scripts" folder as a fallback)
 
     Examples:
         hello.py
-        train.py
-        test.py
+        scripts/train.py
+        /Users/me/project/test.py
+        C:\\Users\\me\\project\\train.py
     """
 
-    script_path = SCRIPTS_DIR / script_name
+    script_path = _resolve_script_path(script_path_input)
 
     if not script_path.exists():
-        return f"Script '{script_name}' not found."
+        return f"Script '{script_path_input}' not found (looked for: {script_path})."
+
+    if script_path.suffix.lower() != ".py":
+        return f"'{script_path}' does not look like a Python file (expected a .py extension)."
 
     try:
 
@@ -54,6 +96,7 @@ def run_python_script(script_name: str) -> str:
             capture_output=True,
             text=True,
             timeout=300,
+            cwd=script_path.parent,
         )
 
         output = ""
