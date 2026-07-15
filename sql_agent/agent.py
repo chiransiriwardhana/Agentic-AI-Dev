@@ -10,9 +10,19 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from IPython.display import Image, display
 from langchain_core.runnables.graph import CurveStyle, MermaidDrawMethod, NodeStyles
+from dotenv import load_dotenv
 
 
-model = init_chat_model("gpt-5.2")
+# Initialization
+load_dotenv(override=True)
+openai_api_key = os.getenv('OPENAI_API_KEY')
+if openai_api_key:
+    print(f"OpenAI API Key exists and begins {openai_api_key[:8]}")
+else:
+    print("OpenAI API Key not set")
+
+model = init_chat_model("gpt-4o")
+
 url = "https://storage.googleapis.com/benchmarks-artifacts/chinook/Chinook.db"
 local_path = pathlib.Path("Chinook.db")
 
