@@ -57,8 +57,9 @@ flowchart TD
 1. clone the project and cd into root folder.
 1. create virtual environment: python -m venv .venv
 2. activate virtual environment: MacOS: source .venv/bin/activate, Windows: .venv/Scripts/activate
-3. install poetry(if poetry isn't installed): pip install poetry
-4. install dependancies: poetry install
+3. create .env file in the root folder and add your OPENAI_API_KEY
+4. install poetry(if poetry isn't installed): pip install poetry
+5. install dependancies: poetry install
 
 ## Run Script/Command Execution Agent
 1. cd script_executor_agent
