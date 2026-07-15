@@ -158,7 +158,8 @@ pi_1000_digits.txt as the content
 Assistant:
 Done.
 
-- Created content.txt in /Users/chiransiriwardena/Documents/Script_executing_agent/script_executor_agent
+- Created content.txt in /Users/chiransiriwardena/Documents/Script_executing_agent/
+  script_executor_agent
 - Wrote the first 100 numeric digits from pi_1000_digits.txt
 
 content.txt:
