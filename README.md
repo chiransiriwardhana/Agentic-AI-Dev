@@ -76,7 +76,8 @@ Hello World!
 You: run pi_value_compute.py
 
 Assistant:
-Done. The script ran successfully and saved the result to pi_1000_digits.txt(in the scripts directory).
+Done. The script ran successfully and saved the result to pi_1000_digits.txt
+(in the scripts directory).
 
 It printed Pi value starting with:
 3.1415926535897932384626433832795028841971693993751058209749445923...
