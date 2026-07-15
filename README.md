@@ -67,6 +67,7 @@ flowchart TD
 
 e.g
 
+```
 You: run hello-world.py
 
 Assistant:
@@ -93,6 +94,7 @@ Assistant:
 No problem. Could you tell me what you don’t want, and what you’d like instead? If you want me to stop or cancel the previous action, just say “stop,” otherwise let me know what you need help with.
 
 You: exit
+```
 
 ##### Agent only have ability to run python script and runing terminal commands
 
