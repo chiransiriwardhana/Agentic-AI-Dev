@@ -56,7 +56,7 @@ flowchart TD
 ## Installing Dependencies
 1. clone the project and cd into root folder.
 1. create virtual environment: python -m venv .venv
-2. activate virtual environment: MacOS: source .venv/bin/activate, Windows: /venv/Scripts/activate
+2. activate virtual environment: MacOS: source .venv/bin/activate, Windows: .venv/Scripts/activate
 3. install poetry(if poetry isn't installed): pip install poetry
 4. install dependancies: poetry install
 
