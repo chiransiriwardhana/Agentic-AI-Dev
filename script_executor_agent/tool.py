@@ -1,5 +1,6 @@
 import os
 import re
+import platform
 import subprocess
 from pathlib import Path
 
@@ -8,9 +9,7 @@ from langchain.tools import tool
 from langchain_openai import ChatOpenAI
 from langchain.messages import HumanMessage
 
-
 load_dotenv(override=True)
-
 
 # ==========================
 # LLM for shell conversion
@@ -21,13 +20,16 @@ llm = ChatOpenAI(
     temperature=0
 )
 
-
 # ==========================
 # Python Script Tool
 # ==========================
 
 SCRIPTS_DIR = Path("scripts")
 
+# Use the same interpreter that's currently running, instead of assuming
+# "python" resolves correctly (on some systems only "python3" exists).
+import sys
+PYTHON_EXECUTABLE = sys.executable or "python"
 
 @tool
 def run_python_script(script_name: str) -> str:
@@ -48,7 +50,7 @@ def run_python_script(script_name: str) -> str:
     try:
 
         result = subprocess.run(
-            ["python", str(script_path)],
+            [PYTHON_EXECUTABLE, str(script_path)],
             capture_output=True,
             text=True,
             timeout=300,
@@ -67,7 +69,20 @@ def run_python_script(script_name: str) -> str:
     except Exception as e:
         return f"Error: {str(e)}"
 
+# ==========================
+# OS Detection
+# ==========================
 
+SYSTEM = platform.system()  # "Windows", "Darwin" (macOS), or "Linux"
+IS_WINDOWS = SYSTEM == "Windows"
+IS_MACOS = SYSTEM == "Darwin"
+IS_LINUX = SYSTEM == "Linux"
+
+OS_LABEL = {
+    "Windows": "Windows (PowerShell)",
+    "Darwin": "macOS Unix shell",
+    "Linux": "Linux Unix shell",
+}.get(SYSTEM, SYSTEM)
 
 # ==========================
 # Shell Environment
@@ -83,12 +98,10 @@ KNOWN_LOCATIONS = {
     "home": HOME,
 }
 
-
-
 def get_shell_context_text() -> str:
     """
     Internal helper.
-    Provides absolute paths to LLM.
+    Provides absolute paths and OS context to the LLM.
     """
 
     return f"""
@@ -110,10 +123,8 @@ Downloads:
 {KNOWN_LOCATIONS['downloads']}
 
 Operating System:
-macOS Unix shell
+{OS_LABEL}
 """
-
-
 
 # ==========================
 # Shell Utilities
@@ -134,7 +145,6 @@ def normalize_command(command: str) -> str:
 
     return command.strip()
 
-
 def infer_base_directory(user_message: str):
 
     message = user_message.lower()
@@ -145,17 +155,39 @@ def infer_base_directory(user_message: str):
 
     return None
 
+def _windows_mkdir_pattern():
+    # New-Item -ItemType Directory -Path "..." -Force
+    return re.compile(r'^New-Item\s+-ItemType\s+Directory\s+-Path\s+"?(.+?)"?\s*(-Force)?\s*$', re.IGNORECASE)
 
+def _posix_mkdir_pattern():
+    return re.compile(r"^mkdir(?:\s+-p)?\s+(.+)$")
 
 def resolve_command_paths(command: str, user_message: str):
 
     command = os.path.expanduser(normalize_command(command))
-    mkdir_match = re.match(r"^mkdir(?:\s+-p)?\s+(.+)$",command)
 
-    if not mkdir_match:
+    if IS_WINDOWS:
+        match = _windows_mkdir_pattern().match(command)
+        if not match:
+            return command
+
+        raw_path = match.group(1).strip().strip('"').strip("'")
+        path = Path(os.path.expanduser(raw_path))
+
+        if path.is_absolute():
+            resolved = path
+        else:
+            base = (infer_base_directory(user_message) or CWD)
+            resolved = (base / path).resolve()
+
+        return f'New-Item -ItemType Directory -Path "{resolved}" -Force'
+
+    # macOS / Linux
+    match = _posix_mkdir_pattern().match(command)
+    if not match:
         return command
 
-    raw_path = (mkdir_match.group(1).strip().strip('"').strip("'"))
+    raw_path = match.group(1).strip().strip('"').strip("'")
     path = Path(os.path.expanduser(raw_path))
 
     if path.is_absolute():
@@ -166,11 +198,33 @@ def resolve_command_paths(command: str, user_message: str):
 
     return f"mkdir -p {resolved}"
 
-
 def run_shell_command(command: str):
+    """
+    Runs a command using the appropriate shell for the current OS:
+      - Windows -> powershell.exe
+      - macOS/Linux -> the default POSIX shell (via shell=True)
+    """
 
     try:
-        result = subprocess.run(command, shell=True, check=True, text=True, capture_output=True, cwd=CWD)
+        if IS_WINDOWS:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", command],
+                text=True,
+                capture_output=True,
+                cwd=CWD,
+            )
+        else:
+            result = subprocess.run(
+                command,
+                shell=True,
+                text=True,
+                capture_output=True,
+                cwd=CWD,
+                executable="/bin/bash",
+            )
+
+        if result.returncode != 0:
+            return f"Command failed:\n{result.stderr or result.stdout}"
 
         if result.stdout.strip():
             return result.stdout.strip()
@@ -180,43 +234,41 @@ def run_shell_command(command: str):
 
         return "Command executed successfully."
 
-
-    except subprocess.CalledProcessError as e:
-        return f"Command failed:\n{e.stderr or e.stdout}"
-
-
+    except Exception as e:
+        return f"Error running command: {str(e)}"
 
 # ==========================
 # Natural Language -> Shell
 # ==========================
 
-def convert_to_shell_command(natural_language: str):
-    prompt = f"""
+def _examples_for_os() -> str:
+    if IS_WINDOWS:
+        return f"""
+User:
+List files in Documents
 
-{get_shell_context_text()}
+Command:
+Get-ChildItem "{KNOWN_LOCATIONS['documents']}"
 
+User:
+Create folder Test inside Documents
 
-Convert the user request into ONE shell command.
+Command:
+New-Item -ItemType Directory -Path "{KNOWN_LOCATIONS['documents']}\\Test" -Force
 
+User:
+Show disk usage
 
-Rules:
-
-- Return ONLY the command.
-- No markdown.
-- No explanation.
-
-- Always use absolute paths.
-
-- For folders use mkdir -p.
-
-Examples:
-
+Command:
+Get-PSDrive -PSProvider FileSystem
+"""
+    else:
+        return f"""
 User:
 List files in Documents
 
 Command:
 ls {KNOWN_LOCATIONS['documents']}
-
 
 User:
 Create folder Test inside Documents
@@ -224,13 +276,40 @@ Create folder Test inside Documents
 Command:
 mkdir -p {KNOWN_LOCATIONS['documents']}/Test
 
-
 User:
 Show disk usage
 
 Command:
 df -h
+"""
 
+def convert_to_shell_command(natural_language: str):
+    rules = """
+Rules:
+
+- Return ONLY the command.
+- No markdown.
+- No explanation.
+- Always use absolute paths.
+"""
+
+    if IS_WINDOWS:
+        rules += "- Generate a valid Windows PowerShell command (not cmd.exe, not bash/Unix syntax).\n"
+        rules += "- For folders use: New-Item -ItemType Directory -Path <path> -Force\n"
+    else:
+        rules += "- Generate a valid POSIX shell command (bash-compatible).\n"
+        rules += "- For folders use mkdir -p.\n"
+
+    prompt = f"""
+
+{get_shell_context_text()}
+
+Convert the user request into ONE shell command.
+
+{rules}
+
+Examples:
+{_examples_for_os()}
 
 User request:
 
@@ -246,11 +325,9 @@ User request:
         ]
     )
 
-    command = resolve_command_paths(response.content,natural_language)
+    command = resolve_command_paths(response.content, natural_language)
 
     return command
-
-
 
 # ==========================
 # Shell Tool
@@ -259,7 +336,9 @@ User request:
 @tool
 def process_shell_tool(natural_language: str) -> str:
     """
-    Execute operating system commands.
+    Execute operating system commands. Works on macOS, Windows, and Linux —
+    the underlying shell and command syntax are chosen automatically based
+    on the OS this tool is running on.
 
     Examples:
 
