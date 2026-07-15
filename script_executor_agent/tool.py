@@ -1,6 +1,9 @@
 import os
 import re
+import sys
+import shutil
 import platform
+import tempfile
 import subprocess
 from pathlib import Path
 
@@ -19,98 +22,6 @@ llm = ChatOpenAI(
     model="gpt-5",
     temperature=0
 )
-
-# ==========================
-# Python Script Tool
-# ==========================
-
-# Fallback directory used only when a bare filename (no path) is given
-# and it isn't found in the current working directory.
-SCRIPTS_DIR = Path("scripts")
-
-# Use the same interpreter that's currently running, instead of assuming
-# "python" resolves correctly (on some systems only "python3" exists).
-import sys
-PYTHON_EXECUTABLE = sys.executable or "python"
-
-def _resolve_script_path(script_name: str) -> Path:
-    """
-    Resolves a script path from any of:
-      - an absolute path (Windows or POSIX): C:\\Users\\me\\train.py, /home/me/train.py
-      - a relative path from the current working directory: subdir/train.py, ../train.py
-      - a path using "~" for home: ~/scripts/train.py
-      - a bare filename: train.py (checked in CWD first, then SCRIPTS_DIR as a fallback)
-    """
-
-    expanded = os.path.expanduser(script_name.strip().strip('"').strip("'"))
-    candidate = Path(expanded)
-
-    # Absolute path (works for both "C:\..." and "/...") or an explicit relative path
-    if candidate.is_absolute():
-        return candidate
-
-    if candidate.exists():
-        return candidate.resolve()
-
-    # Bare filename or relative path that didn't resolve from CWD directly:
-    # fall back to the scripts/ folder for backward compatibility.
-    fallback = SCRIPTS_DIR / candidate
-    if fallback.exists():
-        return fallback.resolve()
-
-    # Nothing matched; return the most likely candidate so the caller can
-    # report a clear "not found" message with the path it actually tried.
-    return candidate
-
-@tool
-def run_python_script(script_path_input: str) -> str:
-    """
-    Execute a Python script from anywhere on the filesystem.
-
-    Accepts:
-      - An absolute path: /Users/me/project/train.py or C:\\Users\\me\\project\\train.py
-      - A relative path: subdir/train.py or ../scripts/test.py
-      - A "~"-based path: ~/Documents/scripts/train.py
-      - A bare filename: hello.py (checked in the current directory first,
-        then in a local "scripts" folder as a fallback)
-
-    Examples:
-        hello.py
-        scripts/train.py
-        /Users/me/project/test.py
-        C:\\Users\\me\\project\\train.py
-    """
-
-    script_path = _resolve_script_path(script_path_input)
-
-    if not script_path.exists():
-        return f"Script '{script_path_input}' not found (looked for: {script_path})."
-
-    if script_path.suffix.lower() != ".py":
-        return f"'{script_path}' does not look like a Python file (expected a .py extension)."
-
-    try:
-
-        result = subprocess.run(
-            [PYTHON_EXECUTABLE, str(script_path)],
-            capture_output=True,
-            text=True,
-            timeout=300,
-            cwd=script_path.parent,
-        )
-
-        output = ""
-
-        if result.stdout:
-            output += f"STDOUT:\n{result.stdout}\n"
-
-        if result.stderr:
-            output += f"STDERR:\n{result.stderr}\n"
-
-        return output or "Script executed successfully."
-
-    except Exception as e:
-        return f"Error: {str(e)}"
 
 # ==========================
 # OS Detection
@@ -168,6 +79,201 @@ Downloads:
 Operating System:
 {OS_LABEL}
 """
+
+# ==========================
+# Generalized Script Runner
+# ==========================
+
+# Fallback directory used only when a bare filename (no path) is given
+# and it isn't found in the current working directory.
+SCRIPTS_DIR = Path("scripts")
+
+# Use the same interpreter that's currently running, instead of assuming
+# "python" resolves correctly (on some systems only "python3" exists).
+PYTHON_EXECUTABLE = sys.executable or "python"
+
+
+def _resolve_script_path(script_name: str) -> Path:
+    """
+    Resolves a script path from any of:
+      - an absolute path (Windows or POSIX): C:\\Users\\me\\train.py, /home/me/train.py
+      - a relative path from the current working directory: subdir/train.py, ../train.py
+      - a path using "~" for home: ~/scripts/train.py
+      - a bare filename: train.py (checked in CWD first, then SCRIPTS_DIR,
+        then Desktop/Documents/Downloads as a last resort)
+    """
+
+    expanded = os.path.expanduser(script_name.strip().strip('"').strip("'"))
+    candidate = Path(expanded)
+
+    if candidate.is_absolute():
+        return candidate
+
+    if candidate.exists():
+        return candidate.resolve()
+
+    fallback = SCRIPTS_DIR / candidate
+    if fallback.exists():
+        return fallback.resolve()
+
+    for location in (HOME / "Desktop", HOME / "Documents", HOME / "Downloads"):
+        maybe = location / candidate
+        if maybe.exists():
+            return maybe.resolve()
+
+    # Nothing matched; return the most likely candidate so the caller can
+    # report a clear "not found" message with the path it actually tried.
+    return candidate
+
+
+def _is_available(executable: str) -> bool:
+    return shutil.which(executable) is not None
+
+
+# Maps a file extension to how it should be run.
+_INTERPRETERS = {
+    ".py": [PYTHON_EXECUTABLE],
+    ".js": ["node"],
+    ".ts": ["npx", "ts-node"],
+    ".rb": ["ruby"],
+    ".sh": ["bash"],
+    ".ps1": ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File"],
+}
+
+_COMPILED = {
+    ".rs": {"compiler": "rustc"},
+    ".go": {"run_directly": ["go", "run"]},  # go run skips a manual build step
+    ".c": {"compiler": "gcc"},
+    ".cpp": {"compiler": "g++"},
+    ".java": {"compiler": "javac", "run_after": "java"},
+}
+
+
+def _run_interpreted(executable_parts, script_path: Path):
+    return subprocess.run(
+        [*executable_parts, str(script_path)],
+        capture_output=True,
+        text=True,
+        timeout=300,
+        cwd=script_path.parent,
+    )
+
+
+def _run_compiled(ext: str, script_path: Path):
+    spec = _COMPILED[ext]
+
+    # Languages where the toolchain itself runs the file without a separate
+    # explicit compile step (e.g. "go run file.go").
+    if "run_directly" in spec:
+        return subprocess.run(
+            [*spec["run_directly"], str(script_path)],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            cwd=script_path.parent,
+        )
+
+    compiler = spec["compiler"]
+    if not _is_available(compiler):
+        raise RuntimeError(f"'{compiler}' is not installed or not on PATH.")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_dir_path = Path(tmp_dir)
+
+        if ext == ".java":
+            # Java: compile into tmp dir, then run the class by name.
+            compile_result = subprocess.run(
+                [compiler, "-d", str(tmp_dir_path), str(script_path)],
+                capture_output=True, text=True, timeout=300,
+            )
+            if compile_result.returncode != 0:
+                return compile_result
+
+            class_name = script_path.stem
+            return subprocess.run(
+                ["java", "-cp", str(tmp_dir_path), class_name],
+                capture_output=True, text=True, timeout=300,
+            )
+
+        binary_name = script_path.stem + (".exe" if IS_WINDOWS else "")
+        binary_path = tmp_dir_path / binary_name
+
+        compile_result = subprocess.run(
+            [compiler, str(script_path), "-o", str(binary_path)],
+            capture_output=True, text=True, timeout=300,
+        )
+        if compile_result.returncode != 0:
+            return compile_result
+
+        return subprocess.run(
+            [str(binary_path)],
+            capture_output=True, text=True, timeout=300,
+            cwd=script_path.parent,
+        )
+
+
+@tool
+def run_script(script_path_input: str) -> str:
+    """
+    Compile (if needed) and execute a script or source file in any
+    supported language, from anywhere on the filesystem.
+
+    Supported extensions:
+      .py   -> run with Python
+      .js   -> run with Node.js
+      .ts   -> run with ts-node
+      .rb   -> run with Ruby
+      .sh   -> run with bash
+      .ps1  -> run with PowerShell
+      .rs   -> compile with rustc, then run
+      .go   -> run with "go run"
+      .c    -> compile with gcc, then run
+      .cpp  -> compile with g++, then run
+      .java -> compile with javac, then run
+
+    Accepts:
+      - An absolute path: /Users/me/project/main.rs or C:\\Users\\me\\project\\main.rs
+      - A relative path: subdir/train.py or ../scripts/test.js
+      - A "~"-based path: ~/Documents/scripts/train.py
+      - A bare filename: agent.py (checked in CWD, then a local "scripts"
+        folder, then Desktop/Documents/Downloads)
+
+    Examples:
+        hello.py
+        ~/Desktop/agent.py
+        main.rs
+        server.js
+        /Users/me/project/App.java
+    """
+
+    script_path = _resolve_script_path(script_path_input)
+
+    if not script_path.exists():
+        return f"Script '{script_path_input}' not found (looked for: {script_path})."
+
+    ext = script_path.suffix.lower()
+
+    try:
+        if ext in _INTERPRETERS:
+            result = _run_interpreted(_INTERPRETERS[ext], script_path)
+        elif ext in _COMPILED:
+            result = _run_compiled(ext, script_path)
+        else:
+            supported = ", ".join(sorted(set(_INTERPRETERS) | set(_COMPILED)))
+            return f"Unsupported file type '{ext}'. Supported extensions: {supported}"
+
+        output = ""
+        if result.stdout:
+            output += f"STDOUT:\n{result.stdout}\n"
+        if result.stderr:
+            output += f"STDERR:\n{result.stderr}\n"
+
+        return output or "Script executed successfully."
+
+    except subprocess.TimeoutExpired:
+        return "Error: script timed out after 300 seconds."
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 # ==========================
 # Shell Utilities
@@ -379,9 +485,9 @@ User request:
 @tool
 def process_shell_tool(natural_language: str) -> str:
     """
-    Execute operating system commands. Works on macOS, Windows, and Linux —
-    the underlying shell and command syntax are chosen automatically based
-    on the OS this tool is running on.
+    Execute general operating system commands (not script execution).
+    Works on macOS, Windows, and Linux — the underlying shell and command
+    syntax are chosen automatically based on the OS this tool is running on.
 
     Examples:
 

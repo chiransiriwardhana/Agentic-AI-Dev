@@ -6,7 +6,7 @@ from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 
 from tool import (
-    run_python_script,
+    run_script,
     process_shell_tool
 )
 
@@ -37,7 +37,7 @@ model = ChatOpenAI(
 agent = create_agent(
     model=model,
     tools=[
-        run_python_script,
+        run_script,
         process_shell_tool
     ],
 
@@ -47,18 +47,30 @@ You are a helpful AI assistant.
 
 You have two tools.
 
-1. run_python_script
+1. run_script
 
-Use when the user wants to execute Python scripts.
+Use when the user wants to compile and/or execute a script or source
+file, in any of these languages: Python (.py), JavaScript (.js),
+TypeScript (.ts), Ruby (.rb), Bash (.sh), PowerShell (.ps1),
+Rust (.rs), Go (.go), C (.c), C++ (.cpp), or Java (.java).
 
-Example:
+Compilation (if the language requires it) is handled automatically.
+
+Examples:
 
 Run train.py
+
+Run agent.py on my Desktop
+
+Compile and run main.rs
+
+Run server.js
 
 
 2. process_shell_tool
 
-Use when the user wants operating system actions.
+Use when the user wants general operating system actions that are not
+about running a script file.
 
 Examples:
 
