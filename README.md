@@ -51,7 +51,7 @@ flowchart TD
 4. install poetry(if poetry isn't installed): pip install poetry
 5. install dependancies: poetry install
 
-## Run Script/Command Execution Agent
+## Run Coding Assistant Agent
 1. cd script_executor_agent
 2. python agent.py
 3. enter prompt in terminal, agent can run python file outside the current root folder,
