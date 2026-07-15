@@ -146,10 +146,14 @@ I couldn’t find a file named pi_100_digits.txt in the project. Current directo
 - tool.py
 
 Please confirm:
-- Should I create content.txt in the current project root (/Users/chiransiriwardena/Documents/Script_executing_agent/script_executor_agent)?
-- Do you want me to use the first 100 digits from pi_1000_digits.txt as the content, or provide the correct path to pi_100_digits.txt?
+- Should I create content.txt in the current project root (/Users/chiransiriwardena/
+Documents/Script_executing_agent/script_executor_agent)?
+- Do you want me to use the first 100 digits from pi_1000_digits.txt as the content, or
+ provide the correct path to pi_100_digits.txt?
 
-You: yes create content.txt in the current project root (/Users/chiransiriwardena/Documents/Script_executing_agent/script_executor_agent) and use the first 100 digits from pi_1000_digits.txt as the content
+You: yes create content.txt in the current project root (/Users/chiransiriwardena/Documents
+/Script_executing_agent/script_executor_agent) and use the first 100 digits from
+pi_1000_digits.txt as the content
 
 Assistant:
 Done.
