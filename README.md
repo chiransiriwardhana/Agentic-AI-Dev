@@ -1,6 +1,7 @@
-## Script/Command Execution Agent
+## Command Executor Agent
 
-The Script Executor Agent is capable of executing shell commands provided through natural language prompts and running Python scripts. It provides functionalities similar to coding assistant agents.
+The Script Executor Agent is capable of executing commands provided through natural language prompts. It provides 
+functionalities similar to coding assistant agents.
 
 Examples:
 
@@ -13,7 +14,7 @@ Examples:
     “Can you run the pi_value_compute.py file?”
     The agent executes the Python script and displays the output directly in the terminal. The pi_value_compute.py script calculates the value of π up to 1000 decimal places.
 
-The Script Executor Agent demonstrates agentic capabilities by interpreting user instructions, selecting appropriate tools, executing external actions, and returning the results.
+The Command Executor Agent demonstrates agentic capabilities by interpreting user instructions, selecting appropriate tools, executing external actions, and returning the results.
 
 ## SQL Agent
 
@@ -157,8 +158,6 @@ Anything else you'd like me to do with this file?
 
 You: exit
 ```
-
-##### Agent only have ability to run python script and runing terminal commands
 
 ## Run SQL Agent
 1. cd sql_agent
