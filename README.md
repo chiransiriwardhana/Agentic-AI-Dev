@@ -52,3 +52,50 @@ flowchart TD
     F --> G
 
 ```
+
+## Installing Dependencies
+1. clone the project and cd into root folder.
+1. create virtual environment: python -m venv .venv
+2. activate virtual environment: MacOS: source .venv/bin/activate, Windows: /venv/Scripts/activate
+3. install poetry(if poetry isn't installed): pip install poetry
+4. install dependancies: poetry install
+
+## Run Script/Command Execution Agent
+1. cd script_executor_agent
+2. python agent.py
+3. enter you prompt in terminal, if you want to end chat then type exit.
+
+e.g
+
+You: run hello-world.py
+
+Assistant:
+Hello World!
+
+You: run pi_value_compute.py
+
+Assistant:
+Done. The script ran successfully and saved the result to pi_1000_digits.txt (in the scripts directory).
+
+It printed Pi value starting with:
+3.1415926535897932384626433832795028841971693993751058209749445923...
+
+Would you like me to display all digits here or open the file?
+
+You: open  pi_1000_digits.txt
+
+Assistant:
+I’ve opened the file pi_1000_digits.txt. Let me know if you’d like me to display its contents, search for something specific, or perform any other action with it.
+
+You: no i donot want
+
+Assistant:
+No problem. Could you tell me what you don’t want, and what you’d like instead? If you want me to stop or cancel the previous action, just say “stop,” otherwise let me know what you need help with.
+
+You: exit
+
+##### Agent only have ability to run python script and runing terminal commands
+
+## Run SQL Agent
+1. cd sql_agent
+2. python agent.py
