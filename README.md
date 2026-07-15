@@ -63,7 +63,15 @@ flowchart TD
 ## Run Script/Command Execution Agent
 1. cd script_executor_agent
 2. python agent.py
-3. enter you prompt in terminal, if you want to end chat then type exit.
+3. enter prompt in terminal, agent can run python file outside the current root folder,
+   but you need to specify the
+      - absolute path: /Users/me/project/train.py
+      - or relative path: subdir/train.py or ../scripts/test.py
+      - or "~"-based path: ~/Documents/scripts/train.py
+      - or bare filename: hello.py (but checked in the current directory first,
+        then in a local "scripts" folder as a fallback)
+  
+5.   if you want to end chat then type exit.
 
 e.g
 
