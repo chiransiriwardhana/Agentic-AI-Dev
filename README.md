@@ -21,12 +21,11 @@ This code implements a SQL Database Agent using LangGraph + LangChain. The agent
 
 User question → LLM reasoning → SQL generation → SQL validation → Database execution → Answer
 
-
-               ```mermaid
+```mermaid
 
 flowchart TD
 
-    A[User<br/>"Which genre has longest tracks?"]
+    A[User: Which genre has longest tracks?]
 
     B[LangGraph Agent]
 
