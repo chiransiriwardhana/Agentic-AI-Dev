@@ -1,6 +1,11 @@
 #include <iostream>
 int main() {
-    const int n = 10;
+    std::cout << "Enter n: ";
+    int n;
+    if (!(std::cin >> n) || n < 0) {
+        std::cerr << "Please enter a non-negative integer." << std::endl;
+        return 1;
+    }
     long long a = 0, b = 1;
     for (int i = 0; i < n; ++i) {
         std::cout << a;

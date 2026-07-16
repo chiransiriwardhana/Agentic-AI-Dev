@@ -1,9 +1,6 @@
 import os
 import re
-import sys
-import shutil
 import platform
-import tempfile
 import subprocess
 from pathlib import Path
 
@@ -24,65 +21,12 @@ llm = ChatOpenAI(
 )
 
 # ==========================
-# OS Detection
-# ==========================
-
-SYSTEM = platform.system()  # "Windows", "Darwin" (macOS), or "Linux"
-IS_WINDOWS = SYSTEM == "Windows"
-IS_MACOS = SYSTEM == "Darwin"
-IS_LINUX = SYSTEM == "Linux"
-
-OS_LABEL = {
-    "Windows": "Windows (PowerShell)",
-    "Darwin": "macOS Unix shell",
-    "Linux": "Linux Unix shell",
-}.get(SYSTEM, SYSTEM)
-
-# ==========================
-# Shell Environment
-# ==========================
-
-HOME = Path.home()
-CWD = Path.cwd()
-
-KNOWN_LOCATIONS = {
-    "documents": HOME / "Documents",
-    "desktop": HOME / "Desktop",
-    "downloads": HOME / "Downloads",
-    "home": HOME,
-}
-
-def get_shell_context_text() -> str:
-    """
-    Internal helper.
-    Provides absolute paths and OS context to the LLM.
-    """
-
-    return f"""
-Environment:
-
-HOME:
-{HOME}
-
-Current working directory:
-{CWD}
-
-Documents:
-{KNOWN_LOCATIONS['documents']}
-
-Desktop:
-{KNOWN_LOCATIONS['desktop']}
-
-Downloads:
-{KNOWN_LOCATIONS['downloads']}
-
-Operating System:
-{OS_LABEL}
-"""
-
-# ==========================
 # Generalized Script Runner
 # ==========================
+
+import sys
+import shutil
+import tempfile
 
 # Fallback directory used only when a bare filename (no path) is given
 # and it isn't found in the current working directory.
@@ -99,8 +43,8 @@ def _resolve_script_path(script_name: str) -> Path:
       - an absolute path (Windows or POSIX): C:\\Users\\me\\train.py, /home/me/train.py
       - a relative path from the current working directory: subdir/train.py, ../train.py
       - a path using "~" for home: ~/scripts/train.py
-      - a bare filename: train.py (checked in CWD first, then SCRIPTS_DIR,
-        then Desktop/Documents/Downloads as a last resort)
+      - a bare filename: train.py (checked in CWD first, then SCRIPTS_DIR as a fallback,
+        then Documents/Desktop/Downloads as a last resort)
     """
 
     expanded = os.path.expanduser(script_name.strip().strip('"').strip("'"))
@@ -131,6 +75,8 @@ def _is_available(executable: str) -> bool:
 
 
 # Maps a file extension to how it should be run.
+# "interpreter": run directly with an interpreter, no build step.
+# "compiled": needs a compile step first, then run the produced binary.
 _INTERPRETERS = {
     ".py": [PYTHON_EXECUTABLE],
     ".js": ["node"],
@@ -150,13 +96,14 @@ _COMPILED = {
 
 
 def _run_interpreted(executable_parts, script_path: Path):
-    return subprocess.run(
+    result = subprocess.run(
         [*executable_parts, str(script_path)],
         capture_output=True,
         text=True,
         timeout=300,
         cwd=script_path.parent,
     )
+    return result
 
 
 def _run_compiled(ext: str, script_path: Path):
@@ -195,7 +142,7 @@ def _run_compiled(ext: str, script_path: Path):
                 capture_output=True, text=True, timeout=300,
             )
 
-        binary_name = script_path.stem + (".exe" if IS_WINDOWS else "")
+        binary_name = script_path.stem + (".exe" if IS_WINDOWS_NAME() else "")
         binary_path = tmp_dir_path / binary_name
 
         compile_result = subprocess.run(
@@ -210,6 +157,12 @@ def _run_compiled(ext: str, script_path: Path):
             capture_output=True, text=True, timeout=300,
             cwd=script_path.parent,
         )
+
+
+def IS_WINDOWS_NAME():
+    # Defined ahead of the OS-detection block below; re-checks directly
+    # so this helper works no matter where it's called from in the file.
+    return platform.system() == "Windows"
 
 
 @tool
@@ -274,6 +227,238 @@ def run_script(script_path_input: str) -> str:
         return "Error: script timed out after 300 seconds."
     except Exception as e:
         return f"Error: {str(e)}"
+
+# ==========================
+# File Read / Edit Tools
+# ==========================
+
+import difflib
+
+def _resolve_file_path(path_input: str) -> Path:
+    """
+    Same resolution rules as _resolve_script_path, reused for reading
+    and editing arbitrary files (not just runnable scripts).
+    """
+    return _resolve_script_path(path_input)
+
+
+@tool
+def read_file(path_input: str) -> str:
+    """
+    Read and return the contents of a file, with line numbers, so it can
+    be inspected before making an edit.
+
+    Accepts the same kinds of paths as run_script: absolute, relative,
+    "~"-based, or a bare filename (checked in CWD, "scripts/", then
+    Desktop/Documents/Downloads).
+
+    Examples:
+        buggy.py
+        ~/Desktop/agent.py
+        src/main.rs
+    """
+
+    file_path = _resolve_file_path(path_input)
+
+    if not file_path.exists():
+        return f"File '{path_input}' not found (looked for: {file_path})."
+
+    if not file_path.is_file():
+        return f"'{file_path}' is not a file."
+
+    try:
+        text = file_path.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        return f"Error reading file: {str(e)}"
+
+    numbered = "\n".join(
+        f"{i + 1:>4}: {line}" for i, line in enumerate(text.splitlines())
+    )
+    return f"Contents of {file_path}:\n\n{numbered}"
+
+
+def _confirm_write(file_path: Path, diff_text: str) -> bool:
+    """
+    Shows a diff preview and asks for explicit confirmation in the
+    terminal before writing changes to disk. Returns True if approved.
+    """
+    print(f"\n--- Proposed change to {file_path} ---")
+    print(diff_text if diff_text.strip() else "(no visible diff — check content)")
+    print("--- end of proposed change ---")
+    answer = input(f"Apply this change to {file_path}? [y/N]: ").strip().lower()
+    return answer in ("y", "yes")
+
+
+@tool
+def edit_file(path_input: str, old_str: str, new_str: str) -> str:
+    """
+    Apply a targeted find-and-replace edit to a file: replaces the first
+    exact occurrence of old_str with new_str. Shows a diff and asks for
+    user confirmation in the terminal before writing.
+
+    Use this for bug fixes and small changes rather than rewriting the
+    whole file. old_str must match the file's existing content exactly
+    (whitespace included) and should be unique enough to target the
+    right spot.
+
+    Examples:
+        path_input: "buggy.py"
+        old_str:    "return a / b"
+        new_str:    "return a / b if b != 0 else 0"
+    """
+
+    file_path = _resolve_file_path(path_input)
+
+    if not file_path.exists():
+        return f"File '{path_input}' not found (looked for: {file_path})."
+
+    try:
+        original = file_path.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        return f"Error reading file: {str(e)}"
+
+    if old_str not in original:
+        return (
+            f"Could not find the given old_str in {file_path}. "
+            "Make sure it matches the file's exact current content "
+            "(use read_file first to confirm)."
+        )
+
+    if original.count(old_str) > 1:
+        return (
+            f"old_str appears {original.count(old_str)} times in {file_path}, "
+            "which is ambiguous. Include more surrounding context to make it unique."
+        )
+
+    updated = original.replace(old_str, new_str, 1)
+
+    diff_text = "\n".join(
+        difflib.unified_diff(
+            original.splitlines(),
+            updated.splitlines(),
+            fromfile=str(file_path),
+            tofile=str(file_path),
+            lineterm="",
+        )
+    )
+
+    if not _confirm_write(file_path, diff_text):
+        return "Edit cancelled by user."
+
+    try:
+        file_path.write_text(updated, encoding="utf-8")
+    except Exception as e:
+        return f"Error writing file: {str(e)}"
+
+    return f"Edit applied to {file_path}."
+
+
+@tool
+def write_file(path_input: str, content: str) -> str:
+    """
+    Create a new file, or fully overwrite an existing one, with the
+    given content. Shows a diff (or full content, for new files) and
+    asks for user confirmation in the terminal before writing.
+
+    Prefer edit_file for small fixes to existing files; use write_file
+    for new files or full rewrites.
+
+    Examples:
+        path_input: "~/Desktop/new_script.py"
+        content:    "print('hello')"
+    """
+
+    file_path = _resolve_file_path(path_input)
+    # For new files, _resolve_file_path may just echo back a relative
+    # candidate since nothing exists yet -- resolve it against CWD.
+    if not file_path.is_absolute():
+        file_path = (Path.cwd() / file_path).resolve()
+
+    original = ""
+    if file_path.exists():
+        try:
+            original = file_path.read_text(encoding="utf-8", errors="replace")
+        except Exception as e:
+            return f"Error reading existing file: {str(e)}"
+
+    if original:
+        diff_text = "\n".join(
+            difflib.unified_diff(
+                original.splitlines(),
+                content.splitlines(),
+                fromfile=str(file_path),
+                tofile=str(file_path),
+                lineterm="",
+            )
+        )
+    else:
+        diff_text = f"(new file)\n{content}"
+
+    if not _confirm_write(file_path, diff_text):
+        return "Write cancelled by user."
+
+    try:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(content, encoding="utf-8")
+    except Exception as e:
+        return f"Error writing file: {str(e)}"
+
+    return f"File written to {file_path}."
+
+
+
+SYSTEM = platform.system()  # "Windows", "Darwin" (macOS), or "Linux"
+IS_WINDOWS = SYSTEM == "Windows"
+IS_MACOS = SYSTEM == "Darwin"
+IS_LINUX = SYSTEM == "Linux"
+
+OS_LABEL = {
+    "Windows": "Windows (PowerShell)",
+    "Darwin": "macOS Unix shell",
+    "Linux": "Linux Unix shell",
+}.get(SYSTEM, SYSTEM)
+
+# ==========================
+# Shell Environment
+# ==========================
+
+HOME = Path.home()
+CWD = Path.cwd()
+
+KNOWN_LOCATIONS = {
+    "documents": HOME / "Documents",
+    "desktop": HOME / "Desktop",
+    "downloads": HOME / "Downloads",
+    "home": HOME,
+}
+
+def get_shell_context_text() -> str:
+    """
+    Internal helper.
+    Provides absolute paths and OS context to the LLM.
+    """
+
+    return f"""
+Environment:
+
+HOME:
+{HOME}
+
+Current working directory:
+{CWD}
+
+Documents:
+{KNOWN_LOCATIONS['documents']}
+
+Desktop:
+{KNOWN_LOCATIONS['desktop']}
+
+Downloads:
+{KNOWN_LOCATIONS['downloads']}
+
+Operating System:
+{OS_LABEL}
+"""
 
 # ==========================
 # Shell Utilities
@@ -485,9 +670,9 @@ User request:
 @tool
 def process_shell_tool(natural_language: str) -> str:
     """
-    Execute general operating system commands (not script execution).
-    Works on macOS, Windows, and Linux — the underlying shell and command
-    syntax are chosen automatically based on the OS this tool is running on.
+    Execute operating system commands. Works on macOS, Windows, and Linux —
+    the underlying shell and command syntax are chosen automatically based
+    on the OS this tool is running on.
 
     Examples:
 
