@@ -84,7 +84,7 @@ sequenceDiagram
   
 5.   if you want to end chat then type exit.
 
-#### write a program to print first 10 fibonacci numbers in C++
+#### prompt: write a program to print first 10 fibonacci numbers in C++
 
 ```
 python agent.py
@@ -138,7 +138,7 @@ How you can run it locally:
   - fib.exe
 ```
 
-#### fix bugs in fib.cpp
+#### prompt: fix bugs in fib.cpp
 
 ```
 python agent.py 
@@ -241,7 +241,7 @@ You: exit
 ```
 
 
-#### Runing Rust program
+#### prompt: Runing Rust program
 
 ```
 python agent.py
