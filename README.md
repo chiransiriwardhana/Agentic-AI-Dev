@@ -1,7 +1,6 @@
 ## 1. Coding Assistant Agent
 
-The Coding Assistant is capable of writing programs, modifying or fixing issues while executing terminal commands provided as tools. I
-The Coding Assistant demonstrates agentic capabilities by interpreting user instructions, selecting appropriate tools, executing external actions, and returning the results.
+The Coding Assistant is capable of writing programs, modifying or fixing issues while executing terminal commands provided as tools. Coding Assistant run generated program in its own environment using the provided tool and verify whether program run properly and produce expected results. The Coding Assistant demonstrates agentic capabilities by interpreting user instructions, selecting appropriate tools, executing external actions, and returning the results.
 
 ## Agent Workflow
 
