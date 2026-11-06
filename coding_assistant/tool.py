@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from langchain.tools import tool
 from langchain_openai import ChatOpenAI
 from langchain.messages import HumanMessage
+from langchain_groq import ChatGroq
 
 load_dotenv(override=True)
 
@@ -15,9 +16,19 @@ load_dotenv(override=True)
 # LLM for shell conversion
 # ==========================
 
-llm = ChatOpenAI(
-    model="gpt-5",
-    temperature=0
+# llm = ChatOpenAI(
+#     model="gpt-5",
+#     temperature=0
+# )
+
+
+llm = ChatGroq(
+    model="openai/gpt-oss-20b",
+    api_key=os.environ["GROQ_API_KEY"],
+    temperature=0,
+    reasoning_format="parsed",   # puts reasoning into additional_kwargs["reasoning_content"]
+    reasoning_effort="high",     # gpt-oss: "low" | "medium" | "high" (more = longer reasoning)
+    model_kwargs={"parallel_tool_calls": False},
 )
 
 # ==========================
@@ -221,12 +232,139 @@ def run_script(script_path_input: str) -> str:
         if result.stderr:
             output += f"STDERR:\n{result.stderr}\n"
 
+        combined = f"{result.stdout or ''}{result.stderr or ''}"
+        missing = extract_missing_python_module(combined) if ext == ".py" else None
+        if missing:
+            pip_name = _pip_name_for_import(missing)
+            output += (
+                f"\nMISSING PYTHON DEPENDENCY: '{missing}' "
+                f"(install with install_python_dependencies using '{pip_name}')."
+            )
+
         return output or "Script executed successfully."
 
     except subprocess.TimeoutExpired:
         return "Error: script timed out after 300 seconds."
     except Exception as e:
         return f"Error: {str(e)}"
+
+
+# ==========================
+# Python dependency installer
+# ==========================
+
+# Import names that do not match the pip distribution name.
+_IMPORT_TO_PIP = {
+    "cv2": "opencv-python",
+    "PIL": "Pillow",
+    "pillow": "Pillow",
+    "sklearn": "scikit-learn",
+    "skimage": "scikit-image",
+    "bs4": "beautifulsoup4",
+    "yaml": "PyYAML",
+    "dateutil": "python-dateutil",
+    "dotenv": "python-dotenv",
+    "wx": "wxPython",
+    "gi": "PyGObject",
+    "attr": "attrs",
+    "serial": "pyserial",
+    "usb": "pyusb",
+    "Crypto": "pycryptodome",
+    "Cryptodome": "pycryptodome",
+    "lxml": "lxml",
+    "Image": "Pillow",
+}
+
+_MISSING_MODULE_RE = re.compile(
+    r"(?:ModuleNotFoundError|ImportError): No module named ['\"]([^'\"]+)['\"]"
+)
+
+
+def _pip_name_for_import(import_name: str) -> str:
+    top_level = import_name.split(".")[0].strip()
+    return _IMPORT_TO_PIP.get(top_level, top_level)
+
+
+def _parse_package_list(packages: str) -> list[str]:
+    tokens = re.split(r"[,\s]+", packages.strip())
+    names = []
+    seen = set()
+    for token in tokens:
+        token = token.strip().strip("'\"")
+        if not token:
+            continue
+        pip_name = _pip_name_for_import(token)
+        key = pip_name.lower()
+        if key not in seen:
+            seen.add(key)
+            names.append(pip_name)
+    return names
+
+
+def extract_missing_python_module(output: str) -> str | None:
+    match = _MISSING_MODULE_RE.search(output or "")
+    if not match:
+        return None
+    return match.group(1)
+
+
+@tool
+def install_python_dependencies(packages: str) -> str:
+    """
+    Install one or more Python packages into the SAME interpreter that
+    run_script uses (sys.executable -m pip). Use this when a Python
+    script fails with ModuleNotFoundError / ImportError, or when the
+    user asks to install libraries before running a .py file.
+
+    Pass import names or pip names, comma- or space-separated.
+    Common mismatches are mapped automatically (e.g. cv2 -> opencv-python,
+    sklearn -> scikit-learn, PIL -> Pillow).
+
+    Examples:
+        numpy
+        numpy pandas
+        cv2, sklearn
+    """
+
+    names = _parse_package_list(packages)
+    if not names:
+        return "No package names were provided."
+
+    if not _is_available(PYTHON_EXECUTABLE) and not Path(PYTHON_EXECUTABLE).exists():
+        return f"Python interpreter not found: {PYTHON_EXECUTABLE}"
+
+    cmd = [PYTHON_EXECUTABLE, "-m", "pip", "install", *names]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired:
+        return f"Error: pip install timed out after 300 seconds for: {' '.join(names)}"
+    except Exception as e:
+        return f"Error running pip install: {str(e)}"
+
+    output = ""
+    if result.stdout:
+        output += f"STDOUT:\n{result.stdout}\n"
+    if result.stderr:
+        output += f"STDERR:\n{result.stderr}\n"
+
+    if result.returncode != 0:
+        return (
+            f"Failed to install {', '.join(names)} into {PYTHON_EXECUTABLE}.\n"
+            f"Command: {' '.join(cmd)}\n"
+            f"{output or 'No pip output.'}"
+        )
+
+    return (
+        f"Installed {', '.join(names)} into {PYTHON_EXECUTABLE}.\n"
+        f"{output or 'pip reported success with no extra output.'}"
+    )
+
 
 # ==========================
 # File Read / Edit Tools
