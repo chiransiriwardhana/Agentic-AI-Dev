@@ -12,9 +12,6 @@ from langchain_groq import ChatGroq
 
 load_dotenv(override=True)
 
-# ==========================
-# LLM for shell conversion
-# ==========================
 
 # llm = ChatOpenAI(
 #     model="gpt-5",
@@ -26,14 +23,13 @@ llm = ChatGroq(
     model="openai/gpt-oss-20b",
     api_key=os.environ["GROQ_API_KEY"],
     temperature=0,
-    reasoning_format="parsed",   # puts reasoning into additional_kwargs["reasoning_content"]
-    reasoning_effort="high",     # gpt-oss: "low" | "medium" | "high" (more = longer reasoning)
+    reasoning_format="parsed",   
+    reasoning_effort="high",   
     model_kwargs={"parallel_tool_calls": False},
 )
 
-# ==========================
+
 # Generalized Script Runner
-# ==========================
 
 import sys
 import shutil
@@ -366,9 +362,8 @@ def install_python_dependencies(packages: str) -> str:
     )
 
 
-# ==========================
+
 # File Read / Edit Tools
-# ==========================
 
 import difflib
 
@@ -709,9 +704,8 @@ def run_shell_command(command: str):
     except Exception as e:
         return f"Error running command: {str(e)}"
 
-# ==========================
-# Natural Language -> Shell
-# ==========================
+
+# Natural Language  Shell
 
 def _examples_for_os() -> str:
     if IS_WINDOWS:
@@ -801,9 +795,8 @@ User request:
 
     return command
 
-# ==========================
+
 # Shell Tool
-# ==========================
 
 @tool
 def process_shell_tool(natural_language: str) -> str:

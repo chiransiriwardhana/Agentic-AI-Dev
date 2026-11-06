@@ -18,18 +18,12 @@ from tool import (
     install_python_dependencies,
 )
 
-# ======================
-# Environment
-# ======================
 
 load_dotenv(override=True)
 
 if not os.getenv("OPENAI_API_KEY"):
     raise ValueError("OPENAI_API_KEY is missing")
 
-# ======================
-# Model
-# ======================
 
 # model = ChatOpenAI(
 #     model="gpt-5",
@@ -51,16 +45,12 @@ llm = ChatGroq(
     api_key=os.environ["GROQ_API_KEY"],
     temperature=0,
     streaming=True,
-    reasoning_format="parsed",   # puts reasoning into additional_kwargs["reasoning_content"]
-    reasoning_effort="high",     # gpt-oss: "low" | "medium" | "high" (more = longer reasoning)
+    reasoning_format="parsed",   
+    reasoning_effort="high",   
     model_kwargs={"parallel_tool_calls": False},
 )
 
 
-
-# ======================
-# Agent
-# ======================
 
 agent = create_agent(
     model=llm,
